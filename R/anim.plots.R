@@ -1,33 +1,28 @@
 
+#' anim.plots: simple animated plots For R
+#'
+#' anim.plots provides simple animated versions of basic R plots, using the 'animation'
+#' package. It includes animated versions of plot, barplot, persp, contour,
+#' filled.contour, hist, curve, points, lines, text, symbols, segments, and
+#' arrows.
+#' @docType package
+#' @details
+#'
+#' For more information, run \code{vignette('anim.plots-stub')}, or check the vignette out
+#' on the web at \url{https://hughjonesd.github.io/anim.plots/anim.plots.html}.
+#'
+#' @name anim.plots-package
+NULL
+
 #' @import animation
+#' @import graphics
+#' @import grDevices
+NULL
 
 # TODO:
-# density, stars, polygons? 
+# density, stars, polygons?
 # plot3d - is this possible? persp is done...
-# how to save while respecting intervals: interpolate data for frames
-# in .do.loop:  
-# EXAMPLE:
-# ht <- 40
-# x <- rep(1, ht)
-# y <- 1:ht
-# intervals <- jitter(ht:1/20) # in seconds
-# times <- cumsum(intervals)
-# ani.record(reset=T)
-# 
-# framerate <- 50 # per second
-# intervals <- round(intervals*framerate)
-# 
-# # interpolate data? But, can I do this in general?
-# # if so, the whole .do.loop would have to be rewritten to, indeed, smooth stuff.
-# # a set of "smoothable" parameters.
-# # if it were told to smooth, the intervals would be replaced by 1 and smoothed
-# # versions of everything would be created. The resulting plot would be recorded.
-# 
-# # e.g. if intervals are 5,4,3,2,1. in [ x[1] , x[2] ) we want 5 intervals, etc.
-# # in general for every variable: take x as sequence along it. it as y. then create xout
-# spaced <- seq(min(times), max(times), length.out=max(times))
-# x <- approx(times, x, xout=spaced)$y
-# y <- approx(times, y, xout=spaced)$y
+# anim.do general public function?
 
 .setup.anim <- function (reset=TRUE, dev.control.enable=TRUE) {
   if (dev.cur()==1) dev.new()
@@ -35,7 +30,6 @@
   ani.record(reset=reset)
   # if (! is.null(interval)) .old.ani.options <<- ani.options(interval=interval)
 }
-
 
 .do.loop <- function(fn, times, show=TRUE, speed=1, use.times=TRUE, window=t,
       window.process=NULL, slice.args=list(), chunk.args=list(), oth.args=list(), 
@@ -102,23 +96,6 @@
   return(invisible(mycalls))
 }
 
-.col.interp <- function(colmat, smooth) {
-  ncolours <- (ncol(colmat)-1)*smooth + 1
-  colmat <- t(apply(colmat, 1, function(cl) 
-    colorRampPalette(cl, alpha=TRUE)(ncolours)
-  ))
-  return(colmat) 
-}
-
-.interp <- function (obj, smooth) {
-  size <- if(is.matrix(obj)) ncol(obj) else length(obj)
-  xout <- seq(1, size, 1/smooth) 
-  if (is.matrix(obj)) return(t(apply(obj, 1, function (y)
-    approx(1:size, y, xout)$y)
-  ))
-  approx(1:size, obj, xout)$y
-}
-
 .plot.segments <- function(..., fn=quote(segments)) {
   mc <- match.call()
   dots <- list(...)
@@ -133,60 +110,7 @@
 
 .plot.arrows <- function(...) .plot.segments(..., fn=quote(arrows))
 
-#' Replay an \code{anim.frames} object
-#' 
-#' Replay all or some of the frames of an object.
-#' 
-#' @param x an \code{anim.frames} object
-#' @param speed a new speed
-#' @param frames numeric vector specifying which frames to replay
-#' @param before an expression to evaluate before each frame is plotted
-#' @param after an expression to evaluate after each frame is plotted
-#' @param ... other arguments (not currently used)
-#' 
-#' @details
-#' \code{before} and \code{after} will have the arguments from the
-#' frame's call available in their environment - see the example.
-#' 
-#' The \code{plot} method simply calls \code{replay}.
-#' 
-#' @examples
-#' 
-#' myplot <- anim.plot(1:10, 1:10, speed=3)
-#' replay(myplot, speed=5)
-#' replay(myplot, frames=c(1,5,6,10))
-#' 
-#' myplot <- anim.plot(x<-rnorm(100), x+rnorm(100,0,3), 20, window=1:t, 
-#'      show=FALSE, main="Regressions as sample size increases")
-#' replay(myplot, after=abline(lm(y~x), col="red"))
-#'  
-#' @export
-replay <- function(...) UseMethod("replay")
 
-#' @export
-#' @rdname replay
-replay.anim.frames <- function(x, frames=1:length(x), speed=attr(x, "speed"),
-  after=NULL, before=NULL, ...) {
-  before2 <- substitute(before)
-  after2 <- substitute(after)
-  .setup.anim(dev.control.enable=attr(x, "dev.control.enable"))
-  times <- attr(x, "times")
-  intervals <- c(diff(times), 0)
-  for (t in frames) {
-    argl <- as.list(x[[t]])
-    if (! missing(before)) eval(before2, argl)
-    eval(x[[t]])
-    if (! missing(after)) eval(after2, argl)
-    ani.record()
-    ani.pause(intervals[t]/speed)
-  }
-  invisible()
-} 
-
-#' @export
-#' @rdname replay
-plot.anim.frames <- function(x, ...) replay(x, ...)
-  
 #' Create an animated barplot.
 #' 
 #' @param height a vector, matrix or array. If a vector it is divided up by 
@@ -242,10 +166,10 @@ anim.barplot.default <- function(height, times=NULL,
 
   hdim <- if(is.matrix(height)) 1 else 2
   if (is.null(times)) {
-    if (is.array(height)) times <- 1:tail(dim(height), 1) else 
+    if (is.array(height)) times <- 1:utils::tail(dim(height), 1) else 
           stop("'times' not specified")
   } else if (length(times)==1) {
-    lng <- if (is.array(height)) tail(dim(height), 1) else length(height)
+    lng <- if (is.array(height)) utils::tail(dim(height), 1) else length(height)
     if (lng %% times != 0) warning("'height' length is not an exact multiple of 'times'")
     times <- rep(1:times, each=lng/times)
   }
@@ -260,8 +184,6 @@ anim.barplot.default <- function(height, times=NULL,
         oth.args=oth.args, arg.dims=arg.dims, chunkargs.ref.length=crl)
 }
 
-# gapminder data: life expectancy, regions (colour), GDP/cap ppp infadjust, pop total,
-# years
 
 #' Create an animated plot.
 #' 
@@ -279,13 +201,14 @@ anim.barplot.default <- function(height, times=NULL,
 #' @param window.process function to call on each window of each times. See details.
 #' @param use.times if \code{TRUE}, animation speed is determined by the 
 #'   \code{times} argument. If \code{FALSE}, animation speed is constant.
-#' @param xlim,ylim,col,pch,labels,cex,lty,lwd,asp,xaxp,yaxp,... arguments passed to 
-#'   \code{\link{plot}}.
-#' @param fn function called to create each frame
+#' @param xlim,ylim,col,pch arguments passed to \code{\link{plot}}.
+#' @param labels,cex,lty,lwd as above.
+#' @param asp,xaxp,yaxp,... as above.
+#' @param fn function called to create each frame.
 #' @param data a data frame from where the values in \code{formula} should be 
-#'    taken
-#' @param formula a \code{\link{formula}} such as \code{y ~ x + time}
-#' @param subset a vector specifying which rows of \code{data} to use
+#'    taken.
+#' @param formula a \code{\link{formula}} of the form \code{y ~ x + time}.
+#' @param subset a vector specifying which rows of \code{data} to use.
 #'   
 #' @details
 #' 
@@ -326,7 +249,7 @@ anim.barplot.default <- function(height, times=NULL,
 #' ## changing line width - a whole-plot parameter
 #' anim.plot(x, y, times, lwd=1:10, type="l")
 #'           
-#' ## times as a single number 
+#' ## times as a single number
 #' anim.plot(1:10, 1:10, times=5)
 #'            
 #' ## incremental plot
@@ -458,7 +381,7 @@ anim.plot.formula <- function(formula, data=parent.frame(), subset=NULL,
   eframe <- parent.frame() 
   md <- eval(m$data, eframe)
   dots <- lapply(m$..., eval, md, eframe) 
-  mf <- model.frame(formula, data=md)
+  mf <- stats::model.frame(formula, data=md)
   subset.expr <- m$subset
   if (!missing(subset)) {
     s <- eval(subset.expr, data, eframe)
@@ -766,108 +689,6 @@ anim.curve <- function(expr, x=NULL, from=0, to=1, n=255, times, type="l", ...) 
   anim.plot(x=x, y=y, times=times, type=type, ...)
 }
 
-#' Save an anim.frames object in various formats.
-#' 
-#' This function simply calls replay on the object and then calls
-#' \code{\link{saveGIF}} and friends on the result.
-#' 
-#' @param obj an \code{anim.frames} object
-#' @param type one of 'GIF', 'Video', 'SWF', 'HTML', or 'Latex'
-#' @param filename file to save to
-#' @param ... arguments passed to e.g. \code{\link{saveGIF}}
-#' 
-#' @details
-#' 
-#' For most of the underlying functions, the \code{times} parameter
-#' will be ignored as if you had set \code{use.times=FALSE}.
-#' 
-#' @examples
-#' 
-#' \dontrun{
-#' tmp <- anim.plot(1:10, 1:10, pch=1:10, show=FALSE)
-#' anim.save(tmp, "GIF", "filename.gif")
-#' 
-#' ## for anything more complex. Note the curlies:
-#' saveGIF({replay(tmp, after=legend("topleft", legend="My legend"))},
-#'  "filename.gif")
-#' }
-#' @export
-anim.save <- function(obj, type, filename, ...) {
-  stopifnot(type %in% c("GIF", "Video", "SWF", "HTML", "Latex"))
-  fn <- as.name(paste("save", type, sep=""))
-  mf <- match.call(expand.dots=FALSE)
-  mf[[1]] <- fn
-  mf$obj <- NULL
-  mf$expr <- substitute(replay(obj))
-  mf$type <- NULL
-  switch(type, 
-    "GIF"=mf$movie.name <- filename, 
-    "Video"=mf$video.name <- filename,
-    "SWF"=mf$swf.name <- filename, 
-    "HTML"=mf$htmlfile <- filename, 
-    "Latex"=mf$latex.filename <- filename
-  )
-  eval(mf)
-}
-
-#' Merge anim.frames objects
-#' 
-#' Merge two or more anim.frames objects to create a new anim.frames object
-#' 
-#' @param ... anim.frames objects returned from, e.g. \code{\link{anim.plot}}
-#' @param speed speed for the merged object. This may be left unspecified only
-#'    if all objects have the same speed.
-#'
-#' @details
-#' If two or more calls in the merged animation are at the same time, calls
-#' from the earlier object in \code{...} will be run first. 
-#' 
-#' If you merge two animations from \code{\link{anim.plot}}, plot.window will be
-#' called before each frame of the merged animation. This may not be what
-#' you want. Instead, use \code{anim.points} or similar for all but the first
-#' animation.
-#' 
-#' 
-#' @examples
-#' tmp <- anim.plot(1:5, 1:5, speed=2)
-#' tmp2 <- anim.plot(1:5, 5:1, col="red", speed=2)
-#' ## Not what you want:
-#' replay(merge(tmp, tmp2))
-#' 
-#' ## better:
-#' tmp3 <- anim.points(1:5, 5:1,col="red", speed=2)
-#' newf <- merge(tmp, tmp3)
-#' replay(newf)
-#' ## NB: result of the merge looks different from the two
-#' ## individual animations
-#' 
-#' ## not the same:
-#' newf2 <- merge(tmp2, tmp) 
-#' ## points will be called before plot!
-#' replay(newf2)
-#' @export
-merge.anim.frames <- function(..., speed=NULL) {
-  frs <- list(...)
-  speeds <- sapply(frs, attr, "speed")
-  if (is.null(speed)) if (max(speeds) > min(speeds)) {
-    stop("'speed' not specified but some objects have different speeds")
-  } else {
-    speed <- max(speeds)
-  }
-  times <- c(sapply(frs, attr, "times"))
-  tiebreaks <- sapply(1:length(frs), function(x) rep(x, length(frs[[x]])))
-  newfr <- unlist(frs, recursive=FALSE)
-  newfr <- newfr[order(times, tiebreaks)]
-  times <- sort(times)
-  class(newfr) <- "anim.frames"
-  attr(newfr, "times") <- times
-  attr(newfr, "speed") <- speed
-  # maybe this is the wrong way to think about it?
-  attr(newfr, "dev.control.enable") <- any(sapply(frs, attr, "dev.control.enable"))
-  newfr
-}
-
-
 
 #' Troop numbers for the Grande Armee's march on Moscow
 #' @name troops
@@ -890,4 +711,15 @@ NULL
 #' Gapminder GDP, life expectancy and population data
 #' @name gm_data
 #' @source http://gapminder.org
+NULL
+
+#' Data from 20 rounds of a public goods game with punishment
+#' 
+#' A 2x3x20 array of data from a laboratory public goods game.
+#' Dimensions are Picked (was subject picked for punishment?),
+#' Contribution (of subject: Non-unique lowest, Not lowest/all same and Unique lowest), and Period. 
+#' 
+#' Provided by the package author.
+#' 
+#' @name PGgame
 NULL
